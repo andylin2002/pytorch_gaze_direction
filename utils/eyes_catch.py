@@ -14,13 +14,12 @@ def eyes_catch(hps, file_name):
     channels = 3
 
     # 專案的根目錄路徑
-    ROOT_DIR = "/home/andy/AILab/AIfinal/pytorch_gaze_redirection-master/"
 
     # 訓練/驗證用的資料目錄
-    DATA_PATH = os.path.join(ROOT_DIR, "client_pictures/")
+    DATA_PATH = os.path.join("client_pictures/")
 
     # 模型資料目錄
-    MODEL_PATH = os.path.join(ROOT_DIR, "utils/eyes_catch_model")
+    MODEL_PATH = os.path.join("utils/eyes_catch_model")
 
     MODEL_FILE_PATH = os.path.join(MODEL_PATH, "shape_predictor_68_face_landmarks.dat")
 
