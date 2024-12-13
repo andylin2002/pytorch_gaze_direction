@@ -41,10 +41,12 @@ class Discriminator(nn.Module):
         # GAN output
         x_gan = self.conv_gan(x) # x_gan.shape = [32, 1, 1, 1]
         x_gan = x_gan.view(x_gan.size(0), -1) # x_gan.shape = [32, 1]
+        x_gan = torch.sigmoid(x_gan) # fake = 0, real = 1
 
         # REG output
         x_reg = self.conv_reg(x) # x_reg.shape = [32, 2, 1, 1]
         x_reg = x_reg.view(x_reg.size(0), -1)  # x_reg.shape = [32, 2]
+        x_reg = torch.tanh(x_reg) # gaze in [-1, 1]
 
         return x_gan, x_reg
 
