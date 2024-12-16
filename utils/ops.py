@@ -147,28 +147,37 @@ def gram(layer):
     grams = torch.bmm(features.transpose(1, 2), features) / denominator  # Batch matrix multiplication and normalization
     return grams
 
-def angular2cart(angular): #角度座標轉換為笛卡爾座標
+def angular2cart(x):
+    """
+    將角度表示 [phi, theta] 轉換為笛卡爾座標 [x, y, z]。
+    輸入 x 是 [batch_size, 2] 的張量。
+    """
+    phi, theta = x[:, 0], x[:, 1]
+    x = torch.cos(phi) * torch.sin(theta)
+    y = torch.sin(phi) * torch.sin(theta)
+    z = torch.cos(theta)
 
-    theta = angular[:, 0] / 180.0 * np.pi
-    phi = angular[:, 1] / 180.0 * np.pi
-    x = np.cos(phi) * np.sin(theta)
-    y = np.sin(phi)
-    z = np.cos(phi) * np.cos(theta)
+    return torch.stack([x, y, z], dim=1)  # shape = [batch_size, 3]
 
-    return np.stack([x, y, z], axis=1)
 
 def angular_error(x, y):
+    """
+    計算角度誤差 (Angular Error)，輸入為兩個張量的角度表示 [phi, theta]。
+    輸出為度數的角度誤差。
+    """
+    # 將角度表示轉換為笛卡爾座標
+    x = angular2cart(x)  # shape = [batch_size, 3]
+    y = angular2cart(y)  # shape = [batch_size, 3]
 
-    x = angular2cart(x) #換成笛卡爾座標
-    y = angular2cart(y) #換成笛卡爾座標
+    # 計算向量的範數
+    x_norm = torch.norm(x, dim=1) + 1e-8  # shape = [batch_size]
+    y_norm = torch.norm(y, dim=1) + 1e-8  # shape = [batch_size]
 
-    x_norm = np.sqrt(np.sum(np.square(x), axis=1))
-    y_norm = np.sqrt(np.sum(np.square(y), axis=1))
+    # 計算餘弦相似度
+    sim = torch.sum(x * y, dim=1) / (x_norm * y_norm)
 
-    # 使用 np.clip 函數將 sim 限制在 [−1,1][−1,1] 範圍內，以避免計算反餘弦時出現錯誤
-    sim = np.divide(np.sum(np.multiply(x, y), axis=1),
-                    np.multiply(x_norm, y_norm))
+    # 限制 sim 在 [-1, 1] 範圍內，避免反餘弦運算錯誤
+    sim = torch.clamp(sim, -1.0, 1.0)
 
-    sim = np.clip(sim, -1.0, 1.0)
-
-    return np.arccos(sim) * 180.0 / np.pi #計算餘弦相似度對應的角度，並將結果轉換為度數
+    # 返回平均角度誤差
+    return torch.acos(sim) * 180.0 / torch.pi

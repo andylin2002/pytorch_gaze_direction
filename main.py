@@ -1,5 +1,6 @@
 import argparse
 import os
+import torch
 
 from src.model import Model
 
@@ -19,7 +20,7 @@ parser.add_argument('--adam_beta1', type=float, default=0.5,
                     help='value of adam beta 1')
 parser.add_argument('--adam_beta2', type=float, default=0.999,
                     help='value of adam beta 2')
-parser.add_argument('--lr', type=float, default=0.0002,
+parser.add_argument('--lr', type=float, default=0.002,
                     help='learning rate')
 
 # training params
@@ -42,6 +43,8 @@ parser.add_argument('--vgg_path', type=str, help='path of vgg model')
 parser.add_argument('--client_pictures_dir', type=str, help='path of eyes images')
 
 params = parser.parse_args()
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = Model(params)
 

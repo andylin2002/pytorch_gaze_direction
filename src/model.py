@@ -164,15 +164,9 @@ class Model(nn.Module):
         # 生成器損失 (Generator Loss)
         adv_g_loss = -torch.mean(gan_fake) 
 
-        def angular_loss(v1, v2):
-            v1 = F.normalize(v1, dim=1)  # 單位化向量
-            v2 = F.normalize(v2, dim=1)
-            cosine_similarity = torch.sum(v1 * v2, dim=1)  # 向量內積
-            return torch.mean(1 - cosine_similarity)  # 角度損失
-
         # 迴歸損失 (Regression Loss)
-        reg_d_loss = angular_loss(self.angles_r, reg_real)
-        reg_g_loss = angular_loss(self.angles_g, reg_fake)
+        reg_d_loss = F.mse_loss(self.angles_r, reg_real)
+        reg_g_loss = F.mse_loss(self.angles_g, reg_fake)
 
         return adv_d_loss, adv_g_loss, reg_d_loss, reg_g_loss, gp
 
@@ -218,7 +212,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        return self.adv_d_loss + 5.0 * self.reg_d_loss
+        return self.adv_d_loss + 200 * self.reg_d_loss
 
     def g_loss_calculator(self, images_r, angles_r, images_t, angles_g):
 
@@ -236,9 +230,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        return (self.adv_g_loss + 5.0 * self.reg_g_loss +  # self.adv_g_loss 定義已加負號
-                                    self.recon_loss +
-                                    self.s_loss + self.c_loss)
+        return self.adv_g_loss + 200 * self.reg_g_loss + 100 * (self.recon_loss + self.s_loss + self.c_loss)
     
     def optimizer(self, model):
 
@@ -318,6 +310,7 @@ class Model(nn.Module):
         (train_iter, test_iter, train_size) = self.data_loader() #加載訓練、驗證和測試數據集的迭代器
 
         num_epoch = hps.epochs
+        self.num_epoch = num_epoch
         batch_size = hps.batch_size
 
         num_iter = train_size // batch_size # num_iter = 1102
@@ -331,6 +324,7 @@ class Model(nn.Module):
         
         try:
             for epoch in range(num_epoch):
+                self.epoch = epoch
                 print(f"Epoch: {epoch+1}/{num_epoch}")
 
                 for it in tqdm(range(num_iter)):
@@ -402,9 +396,9 @@ class Model(nn.Module):
                         self.global_step = epoch * num_iter + it
 
                         d_test_loss = self.d_loss_calculator(self.x_test_r, self.angles_test_g).to(device)
-                        transformed_d_test_loss = torch.exp(d_test_loss / 10).to(device)
+                        transformed_d_test_loss = torch.exp(d_test_loss / 100).to(device)
                         g_test_loss = self.g_loss_calculator(self.x_test_r, self.angles_test_r, self.x_test_t, self.angles_test_g).to(device)
-                        transformed_g_test_loss = torch.exp(g_test_loss / 10).to(device)
+                        transformed_g_test_loss = torch.exp(g_test_loss / 100).to(device)
                         tqdm.write(f"generator test loss: {transformed_g_test_loss:<10.2f}, discriminator test loss: {transformed_d_test_loss:<10.2f}")
 
                         #定義比較模型學習好壞的標準
