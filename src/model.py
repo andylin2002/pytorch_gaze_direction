@@ -164,9 +164,15 @@ class Model(nn.Module):
         # 生成器損失 (Generator Loss)
         adv_g_loss = -torch.mean(gan_fake) 
 
+        def angular_loss(v1, v2):
+            v1 = F.normalize(v1, dim=1)  # 單位化向量
+            v2 = F.normalize(v2, dim=1)
+            cosine_similarity = torch.sum(v1 * v2, dim=1)  # 向量內積
+            return torch.mean(1 - cosine_similarity)  # 角度損失
+
         # 迴歸損失 (Regression Loss)
-        reg_d_loss = F.mse_loss(self.angles_r, reg_real)
-        reg_g_loss = F.mse_loss(self.angles_g, reg_fake)
+        reg_d_loss = angular_loss(self.angles_r, reg_real)
+        reg_g_loss = angular_loss(self.angles_g, reg_fake)
 
         return adv_d_loss, adv_g_loss, reg_d_loss, reg_g_loss, gp
 
@@ -212,7 +218,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        return self.adv_d_loss + 50.0 * self.reg_d_loss
+        return self.adv_d_loss + 5.0 * self.reg_d_loss
 
     def g_loss_calculator(self, images_r, angles_r, images_t, angles_g):
 
@@ -230,7 +236,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        return (self.adv_g_loss + 50.0 * self.reg_g_loss +  # self.adv_g_loss 定義已加負號
+        return (self.adv_g_loss + 5.0 * self.reg_g_loss +  # self.adv_g_loss 定義已加負號
                                     self.recon_loss +
                                     self.s_loss + self.c_loss)
     
@@ -320,8 +326,8 @@ class Model(nn.Module):
         summary_dir = os.path.join(hps.log_dir, 'summary')
         summary_writer = SummaryWriter(log_dir=summary_dir)
         '''
-        d_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.d_op, mode='min', factor=0.8, patience=1, verbose=True)
-        g_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.g_op, mode='min', factor=0.8, patience=1, verbose=True)
+        d_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.d_op, mode='min', factor=0.9, patience=1, verbose=True)
+        g_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.g_op, mode='min', factor=0.9, patience=1, verbose=True)
         
         try:
             for epoch in range(num_epoch):
