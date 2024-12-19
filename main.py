@@ -20,11 +20,11 @@ parser.add_argument('--adam_beta1', type=float, default=0.5,
                     help='value of adam beta 1')
 parser.add_argument('--adam_beta2', type=float, default=0.999,
                     help='value of adam beta 2')
-parser.add_argument('--lr', type=float, default=0.002,
+parser.add_argument('--lr', type=float, default=0.0002,
                     help='learning rate')
 
 # training params
-parser.add_argument('--epochs', type=int, default=16,
+parser.add_argument('--epochs', type=int, default=3,
                     help='number of epochs')
 parser.add_argument('--summary_steps', type=int, default=50,
                     help='summary steps')

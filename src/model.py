@@ -212,7 +212,9 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        return self.adv_d_loss + 200 * self.reg_d_loss
+        reg_weight = 1
+
+        return self.adv_d_loss + reg_weight * self.reg_d_loss
 
     def g_loss_calculator(self, images_r, angles_r, images_t, angles_g):
 
@@ -230,7 +232,11 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        return self.adv_g_loss + 200 * self.reg_g_loss + 100 * (self.recon_loss + self.s_loss + self.c_loss)
+        reg_weight = 1
+        feat_weight = 1
+
+        return self.adv_g_loss + reg_weight * (self.reg_g_loss + self.recon_loss) + \
+                                        feat_weight * (self.s_loss + self.c_loss)
     
     def optimizer(self, model):
 
