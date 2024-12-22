@@ -23,6 +23,7 @@ from utils.paste import paste
 from tqdm import tqdm
 from PIL import Image
 import torchvision.transforms as transforms
+from itertools import cycle
 
 class Model(nn.Module):
     def __init__(self, params):
@@ -124,8 +125,8 @@ class Model(nn.Module):
             test_angles_g
         )
         
-        train_loader = DataLoader(train_dataset, batch_size=hps.batch_size, shuffle=True, num_workers=8)
-        test_loader = DataLoader(test_dataset, batch_size=hps.batch_size, shuffle=False, num_workers=8)
+        train_loader = DataLoader(train_dataset, batch_size=hps.batch_size, shuffle=True, num_workers=8, drop_last=True)
+        test_loader = DataLoader(test_dataset, batch_size=hps.batch_size, shuffle=False, num_workers=8, drop_last=True)
 
         return train_loader, test_loader, train_dataset_num
     
@@ -212,7 +213,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 480
+        reg_weight = 100
 
         return self.adv_d_loss + reg_weight * self.reg_d_loss
 
@@ -232,8 +233,8 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 480
-        feat_weight = 120
+        reg_weight = 100
+        feat_weight = 50
 
         return self.adv_g_loss + reg_weight * (self.reg_g_loss + self.recon_loss) + \
                                         feat_weight * (self.s_loss + self.c_loss)
@@ -332,7 +333,10 @@ class Model(nn.Module):
             for epoch in range(num_epoch):
                 self.epoch = epoch
 
-                for it, (train_batch, test_batch) in enumerate(tqdm(zip(train_iter, test_iter), total=num_iter, desc="Training Progress")):
+                for it, (train_batch, test_batch) in enumerate(tqdm(zip(train_iter, cycle(test_iter)), total=num_iter, desc=f"Epoch: {self.epoch}/{self.num_epoch}")):
+                    transformed_d_test_loss = float('inf')
+                    transformed_g_test_loss = float('inf')
+
                     # 將數據移動到 GPU（如果有可用的話）
                     train_batch = [t.to(device) for t in train_batch]
                     test_batch = [t.to(device) for t in test_batch]

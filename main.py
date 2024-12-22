@@ -32,7 +32,7 @@ parser.add_argument('--summary_steps', type=int, default=50,
 # dataset params
 parser.add_argument('--image_size', type=int, default=64,
                     help='size of cropped images')
-parser.add_argument('--ids', type=int, default=20,
+parser.add_argument('--ids', type=int, default=22,
                     help='number of identities for training')
 
 # evaluation dir
