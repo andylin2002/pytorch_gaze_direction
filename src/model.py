@@ -140,7 +140,7 @@ class Model(nn.Module):
         # 生成插值樣本
         eps = torch.rand((hps.batch_size, 1, 1, 1), device=images_r.device)
         interpolated = eps * images_r + (1. - eps) * images_g
-        interpolated = interpolated.detach().requires_grad_(True)
+        interpolated = interpolated.requires_grad_()
 
         gan_inter, _ = self.discriminator(interpolated)
 
@@ -212,7 +212,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 1
+        reg_weight = 480
 
         return self.adv_d_loss + reg_weight * self.reg_d_loss
 
@@ -232,8 +232,8 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 1
-        feat_weight = 1
+        reg_weight = 480
+        feat_weight = 120
 
         return self.adv_g_loss + reg_weight * (self.reg_g_loss + self.recon_loss) + \
                                         feat_weight * (self.s_loss + self.c_loss)
@@ -318,7 +318,7 @@ class Model(nn.Module):
         num_epoch = hps.epochs
         self.num_epoch = num_epoch
         batch_size = hps.batch_size
-
+        accumulation_steps = 4
         num_iter = train_size // batch_size # num_iter = 1102
         '''
         # 日誌與模型路徑
@@ -331,13 +331,11 @@ class Model(nn.Module):
         try:
             for epoch in range(num_epoch):
                 self.epoch = epoch
-                print(f"Epoch: {epoch+1}/{num_epoch}")
 
-                for it in tqdm(range(num_iter)):
-                    #print(f"batch: {it}/{num_iter}")
-                    # 從 DataLoader 提取批次數據
-                    train_batch = [t.to(device) for t in next(iter(train_iter))]
-                    test_batch = [t.to(device) for t in next(iter(test_iter))]
+                for it, (train_batch, test_batch) in enumerate(tqdm(zip(train_iter, test_iter), total=num_iter, desc="Training Progress")):
+                    # 將數據移動到 GPU（如果有可用的話）
+                    train_batch = [t.to(device) for t in train_batch]
+                    test_batch = [t.to(device) for t in test_batch]
 
                     # 解包訓練數據
                     self.x_r, self.angles_r, self.labels, self.x_t, self.angles_g = train_batch
@@ -362,41 +360,31 @@ class Model(nn.Module):
                     # 訓練 Discriminator
                     self.d_op.zero_grad()
 
-                    # 暫時固定 Generator 的參數
-                    for param in self.generator.parameters():
-                        param.requires_grad = False
-
                     d_loss = self.d_loss_calculator(self.x_r, self.angles_g)
 
                     #print("train discriminator...")
                     d_loss.backward()
-                    self.d_op.step()
-
-                    # 解鎖 Generator 的參數
-                    for param in self.generator.parameters():
-                        param.requires_grad = True
+                    if (it + 1) % accumulation_steps == 0:
+                        self.d_op.step()
+                        del d_loss
 
                     # 訓練 Generator (每 5 步執行一次)
                     if it % 5 == 0:
 
                         self.g_op.zero_grad()
 
-                        # 暫時固定 Discriminator 的參數
-                        for param in self.discriminator.parameters():
-                            param.requires_grad = False
-
                         g_loss = self.g_loss_calculator(self.x_r, self.angles_r, self.x_t, self.angles_g)
                         #print(f"generator loss: {g_loss:<15.2f}, discriminator loss: {d_loss:<15.2f}")
 
                         #print("train generator...")
                         g_loss.backward()
-                        self.g_op.step()
+                        if (it + 1) % accumulation_steps == 0:
+                            self.g_op.step()
+                            del g_loss
 
-                        # 解鎖 Discriminator 的參數
-                        for param in self.discriminator.parameters():
-                            param.requires_grad = True
+                    del train_batch, test_batch
+                    torch.cuda.empty_cache()
 
-                    
                     # 記錄摘要和保存模型
                     if it % hps.summary_steps == 0:
                         self.global_step = epoch * num_iter + it
@@ -424,6 +412,10 @@ class Model(nn.Module):
                         # 使用自定義的 add_summary 函式
                         self.add_summary(summary_writer, self.global_step)
                         '''
+
+                        del d_test_loss, transformed_d_test_loss, g_test_loss, transformed_g_test_loss, challenger_loss
+                        torch.cuda.empty_cache()
+
                 #每個epoch結束調整學習率
                 d_op_scheduler.step(transformed_d_test_loss)
                 g_op_scheduler.step(transformed_g_test_loss)
@@ -441,7 +433,7 @@ class Model(nn.Module):
         checkpoint_path = os.path.join(hps.log_dir, 'current_model.ckpt')
         checkpoint = torch.load(checkpoint_path)
         self.generator.load_state_dict(checkpoint['current_generator'])
-        self.discriminator.load_state_dict(checkpoint['current_discriminator'])##########
+        self.discriminator.load_state_dict(checkpoint['current_discriminator'])
 
         eval_dir = os.path.join(hps.log_dir, 'eval')
         os.makedirs(eval_dir, exist_ok=True)

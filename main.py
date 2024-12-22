@@ -24,7 +24,7 @@ parser.add_argument('--lr', type=float, default=0.0002,
                     help='learning rate')
 
 # training params
-parser.add_argument('--epochs', type=int, default=3,
+parser.add_argument('--epochs', type=int, default=16,
                     help='number of epochs')
 parser.add_argument('--summary_steps', type=int, default=50,
                     help='summary steps')
@@ -32,7 +32,7 @@ parser.add_argument('--summary_steps', type=int, default=50,
 # dataset params
 parser.add_argument('--image_size', type=int, default=64,
                     help='size of cropped images')
-parser.add_argument('--ids', type=int, default=16,
+parser.add_argument('--ids', type=int, default=20,
                     help='number of identities for training')
 
 # evaluation dir
