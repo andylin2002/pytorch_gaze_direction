@@ -213,7 +213,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 100
+        reg_weight = 200
 
         return self.adv_d_loss + reg_weight * self.reg_d_loss
 
@@ -233,8 +233,8 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 100
-        feat_weight = 50
+        reg_weight = 200
+        feat_weight = 100
 
         return self.adv_g_loss + reg_weight * (self.reg_g_loss + self.recon_loss) + \
                                         feat_weight * (self.s_loss + self.c_loss)
@@ -333,7 +333,7 @@ class Model(nn.Module):
             for epoch in range(num_epoch):
                 self.epoch = epoch
 
-                for it, (train_batch, test_batch) in enumerate(tqdm(zip(train_iter, cycle(test_iter)), total=num_iter, desc=f"Epoch: {self.epoch}/{self.num_epoch}")):
+                for it, (train_batch, test_batch) in enumerate(tqdm(zip(train_iter, cycle(test_iter)), total=num_iter, desc=f"Epoch: {epoch + 1}/{num_epoch}")):
                     transformed_d_test_loss = float('inf')
                     transformed_g_test_loss = float('inf')
 
