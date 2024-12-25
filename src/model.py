@@ -163,7 +163,7 @@ class Model(nn.Module):
                 10.0 * gp)
 
         # 生成器損失 (Generator Loss)
-        adv_g_loss = -torch.mean(gan_fake) 
+        adv_g_loss = -torch.mean(gan_fake)
 
         # 迴歸損失 (Regression Loss)
         reg_d_loss = F.mse_loss(self.angles_r, reg_real)
@@ -213,9 +213,10 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 200
+        adv_weight = 10
+        reg_weight = 100
 
-        return self.adv_d_loss + reg_weight * self.reg_d_loss
+        return adv_weight * self.adv_d_loss + reg_weight * self.reg_d_loss
 
     def g_loss_calculator(self, images_r, angles_r, images_t, angles_g):
 
@@ -233,10 +234,12 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        reg_weight = 200
-        feat_weight = 100
+        adv_weight = 5
+        reg_weight = 50
+        recon_weight = 50
+        feat_weight = 10
 
-        return self.adv_g_loss + reg_weight * (self.reg_g_loss + self.recon_loss) + \
+        return adv_weight * self.adv_g_loss + reg_weight * self.reg_g_loss + recon_weight * self.recon_loss + \
                                         feat_weight * (self.s_loss + self.c_loss)
     
     def optimizer(self, model):
