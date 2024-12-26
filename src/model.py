@@ -25,6 +25,16 @@ from PIL import Image
 import torchvision.transforms as transforms
 from itertools import cycle
 
+#D's hyperparameter
+D_ADV_WEIGHT = 10
+D_REG_WEIGHT = 100
+
+#G's hyperparameter
+G_ADV_WEIGHT = 5
+G_REG_WEIGHT = 50
+G_RECON_WEIGHT = 50
+G_FEAT_WEIGHT = 10
+
 class Model(nn.Module):
     def __init__(self, params):
         super(Model, self).__init__()
@@ -213,10 +223,7 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        adv_weight = 10
-        reg_weight = 100
-
-        return adv_weight * self.adv_d_loss + reg_weight * self.reg_d_loss
+        return D_ADV_WEIGHT * self.adv_d_loss + D_REG_WEIGHT * self.reg_d_loss
 
     def g_loss_calculator(self, images_r, angles_r, images_t, angles_g):
 
@@ -234,13 +241,8 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        adv_weight = 5
-        reg_weight = 50
-        recon_weight = 50
-        feat_weight = 10
-
-        return adv_weight * self.adv_g_loss + reg_weight * self.reg_g_loss + recon_weight * self.recon_loss + \
-                                        feat_weight * (self.s_loss + self.c_loss)
+        return G_ADV_WEIGHT * self.adv_g_loss + G_REG_WEIGHT * self.reg_g_loss + G_RECON_WEIGHT * self.recon_loss + \
+                                        G_FEAT_WEIGHT * (self.s_loss + self.c_loss)
     
     def optimizer(self, model):
 
@@ -464,7 +466,7 @@ class Model(nn.Module):
 
             with torch.no_grad():  # 禁用梯度計算
                 generated_image = self.generator(picture_eyes_patch, gaze_angles) # generated_image.shape = [number, 3, 64, 64]
-                ##########
+                
                 print(file_name)
                 test_gan, test_reg = self.discriminator(picture_eyes_patch)
                 print(f"original: gan = {test_gan}, reg = {test_reg}")
