@@ -26,13 +26,13 @@ import torchvision.transforms as transforms
 from itertools import cycle
 
 #D's hyperparameter
-D_ADV_WEIGHT = 10
+D_ADV_WEIGHT = 1
 D_REG_WEIGHT = 100
 
 #G's hyperparameter
-G_ADV_WEIGHT = 5
-G_REG_WEIGHT = 50
-G_RECON_WEIGHT = 50
+G_ADV_WEIGHT = 1
+G_REG_WEIGHT = 100
+G_RECON_WEIGHT = 100
 G_FEAT_WEIGHT = 10
 
 class Model(nn.Module):
@@ -40,9 +40,12 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.generator = Generator(style_dim=2)
         self.discriminator = Discriminator(params)
+
         if params.vgg_path:
             vgg_dict = torch.load(params.vgg_path, map_location=torch.device('cpu'), weights_only=True)
             self.vgg_dict = vgg_dict
+            for param in self.vgg_dict.values():
+                param.requires_grad = False
             print(f"Successfully loaded pretrained weights from {params.vgg_path}")
 
         self.params = params  # 存儲傳遞的參數
@@ -182,8 +185,6 @@ class Model(nn.Module):
         return adv_d_loss, adv_g_loss, reg_d_loss, reg_g_loss, gp
 
     def feat_loss(self, image_g, image_t):
-
-        hps = self.params
         
         # 定義 VGG 模型和需要的層名稱
         content_layers = ["conv5"]  # conv5_3
@@ -194,24 +195,13 @@ class Model(nn.Module):
             "conv4"   # conv4_3
         ]
 
-        # 拼接輸入：將 x_g 和 x_t 合併在一起
-        inputs = torch.cat([image_g, image_t], dim=0) # shape = [32+32, 3, 64, 64]
-
         # 加載預訓練的 VGG16 模型
-        _, end_points = vgg_16(self, inputs)
-        '''
-        # 禁止更新 VGG 的權重
-        for param in vgg.parameters():
-            param.requires_grad = False
-        '''
-        # 通過 VGG 網絡，收集中間層的輸出
-        endpoints_mixed = {}
-        for layer in content_layers + style_layers:
-            endpoints_mixed[layer] = end_points[layer]
+        _, end_points_image_g = vgg_16(self, image_g)
+        _, end_points_image_t = vgg_16(self, image_t)
 
         # 計算內容損失和風格損失
-        c_loss = content_loss(hps, endpoints_mixed, content_layers)
-        s_loss = style_loss(hps, endpoints_mixed, style_layers)
+        c_loss = content_loss(end_points_image_g, end_points_image_t, content_layers)
+        s_loss = style_loss(end_points_image_g, end_points_image_t, style_layers)
 
         return c_loss, s_loss
 
@@ -222,6 +212,15 @@ class Model(nn.Module):
         # regression losses and adversarial losses
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
+
+        '''
+        print(f"adv_d_loss = {self.adv_d_loss}")
+        print(f"reg_d_loss = {self.reg_d_loss}")
+        '''
+        if self.it % 600 == 0:
+            print(f"adv_d_loss = {self.adv_d_loss}")
+            print(f"reg_d_loss = {self.reg_d_loss}")
+
 
         return D_ADV_WEIGHT * self.adv_d_loss + D_REG_WEIGHT * self.reg_d_loss
 
@@ -240,6 +239,18 @@ class Model(nn.Module):
         # regression losses and adversarial losses
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
+
+        '''
+        print(f"adv_g_loss = {self.adv_g_loss}")
+        print(f"reg_g_loss = {self.reg_g_loss}")
+        print(f"recon_loss = {self.recon_loss}")
+        print(f"feat_loss = {self.s_loss + self.c_loss}")
+        '''
+        if self.it % 600 == 0:
+            print(f"adv_g_loss = {self.adv_g_loss}")
+            print(f"reg_g_loss = {self.reg_g_loss}")
+            print(f"recon_loss = {self.recon_loss}")
+            print(f"feat_loss = {self.s_loss + self.c_loss}")
 
         return G_ADV_WEIGHT * self.adv_g_loss + G_REG_WEIGHT * self.reg_g_loss + G_RECON_WEIGHT * self.recon_loss + \
                                         G_FEAT_WEIGHT * (self.s_loss + self.c_loss)
@@ -339,6 +350,7 @@ class Model(nn.Module):
                 self.epoch = epoch
 
                 for it, (train_batch, test_batch) in enumerate(tqdm(zip(train_iter, cycle(test_iter)), total=num_iter, desc=f"Epoch: {epoch + 1}/{num_epoch}")):
+                    self.it = it
                     transformed_d_test_loss = float('inf')
                     transformed_g_test_loss = float('inf')
 
@@ -377,8 +389,8 @@ class Model(nn.Module):
                         self.d_op.step()
                         del d_loss
 
-                    # 訓練 Generator (每 5 步執行一次)
-                    if it % 5 == 0:
+                    # 訓練 Generator (每 3 步執行一次)
+                    if it % 3 == 0:
 
                         self.g_op.zero_grad()
 

@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.models import vgg16_bn
+from torchvision.models import VGG16_BN_Weights
 
 from utils.ops import relu, conv2d, lrelu, instance_norm, deconv2d, tanh
 
@@ -140,6 +142,7 @@ class Generator(nn.Module):
         x = self.output_conv(x)
         x = torch.tanh(x) # torch.Size([32, 3, 64, 64])
         return x
+
 
 def vgg_16(self, inputs):
 
