@@ -25,15 +25,21 @@ from PIL import Image
 import torchvision.transforms as transforms
 from itertools import cycle
 
+#Learning Rate
+D_LR = 0.00005
+G_LR = 0.0002
+
 #D's hyperparameter
 D_ADV_WEIGHT = 1
-D_REG_WEIGHT = 100
+D_REG_WEIGHT = 1
 
 #G's hyperparameter
 G_ADV_WEIGHT = 1
-G_REG_WEIGHT = 100
-G_RECON_WEIGHT = 100
-G_FEAT_WEIGHT = 10
+G_REG_WEIGHT = 1
+G_RECON_WEIGHT = 1
+G_FEAT_WEIGHT = 1000
+
+AUGMENT = True
 
 class Model(nn.Module):
     def __init__(self, params):
@@ -61,7 +67,7 @@ class Model(nn.Module):
         self.generator.apply(init_weights)
         self.discriminator.apply(init_weights)
 
-    def data_loader(self):##
+    def data_loader(self):
         
         hps = self.params
 
@@ -89,7 +95,8 @@ class Model(nn.Module):
                 image_data_class.train_angles_r[each],
                 image_data_class.train_labels[each],
                 image_data_class.train_images_t[each],
-                image_data_class.train_angles_g[each]
+                image_data_class.train_angles_g[each],
+                augment=AUGMENT
             )
 
         train_images = torch.stack(image_data_class.train_images) if isinstance(image_data_class.train_images[0], torch.Tensor) else torch.tensor(image_data_class.train_images, dtype=torch.float32)
@@ -121,7 +128,8 @@ class Model(nn.Module):
                 image_data_class.test_angles_r[each],
                 image_data_class.test_labels[each],
                 image_data_class.test_images_t[each],
-                image_data_class.test_angles_g[each]
+                image_data_class.test_angles_g[each],
+                augment=False
             )
 
         test_images = torch.stack(image_data_class.test_images) if isinstance(image_data_class.test_images[0], torch.Tensor) else torch.tensor(image_data_class.test_images, dtype=torch.float32)
@@ -213,13 +221,10 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        '''
-        print(f"adv_d_loss = {self.adv_d_loss}")
-        print(f"reg_d_loss = {self.reg_d_loss}")
-        '''
-        if self.it % 600 == 0:
-            print(f"adv_d_loss = {self.adv_d_loss}")
-            print(f"reg_d_loss = {self.reg_d_loss}")
+        if (self.it + 1) % 600 == 0:
+            print(f"adv_d_loss = {self.adv_d_loss:<10.5f}")
+            print(f"reg_d_loss = {self.reg_d_loss:<10.5f}")
+            print(" ")
 
 
         return D_ADV_WEIGHT * self.adv_d_loss + D_REG_WEIGHT * self.reg_d_loss
@@ -240,38 +245,33 @@ class Model(nn.Module):
         (self.adv_d_loss, self.adv_g_loss, self.reg_d_loss,
         self.reg_g_loss, self.gp) = self.adv_loss(images_r, images_g)
 
-        '''
-        print(f"adv_g_loss = {self.adv_g_loss}")
-        print(f"reg_g_loss = {self.reg_g_loss}")
-        print(f"recon_loss = {self.recon_loss}")
-        print(f"feat_loss = {self.s_loss + self.c_loss}")
-        '''
-        if self.it % 600 == 0:
-            print(f"adv_g_loss = {self.adv_g_loss}")
-            print(f"reg_g_loss = {self.reg_g_loss}")
-            print(f"recon_loss = {self.recon_loss}")
-            print(f"feat_loss = {self.s_loss + self.c_loss}")
+        if (self.it + 1) % 600 == 0:
+            print(f"adv_g_loss = {self.adv_g_loss:<10.5f}")
+            print(f"reg_g_loss = {self.reg_g_loss:<10.5f}")
+            print(f"recon_loss = {self.recon_loss:<10.5f}")
+            print(f"feat_loss = {self.s_loss + self.c_loss:<10.5f}")
+            print(" ")
 
         return G_ADV_WEIGHT * self.adv_g_loss + G_REG_WEIGHT * self.reg_g_loss + G_RECON_WEIGHT * self.recon_loss + \
                                         G_FEAT_WEIGHT * (self.s_loss + self.c_loss)
     
-    def optimizer(self, model):
+    def optimizer(self, model, lr):
 
         hps = self.params
 
         if hps.optimizer == 'sgd':
-            return optim.SGD(model.parameters(), lr=hps.lr)
+            return optim.SGD(model.parameters(), lr=lr)
         if hps.optimizer == 'adam':
             return optim.Adam(model.parameters(),
-                            lr=hps.lr,
+                            lr=lr,
                             betas=(hps.adam_beta1, hps.adam_beta2))
         raise AttributeError("attribute 'optimizer' is not assigned!")
 
     def add_optimizer(self):
 
         # 創建優化器
-        g_op = self.optimizer(self.generator)
-        d_op = self.optimizer(self.discriminator)
+        g_op = self.optimizer(self.generator, lr=G_LR)
+        d_op = self.optimizer(self.discriminator, lr=D_LR)
 
         return d_op, g_op
     '''
@@ -335,15 +335,15 @@ class Model(nn.Module):
         num_epoch = hps.epochs
         self.num_epoch = num_epoch
         batch_size = hps.batch_size
-        accumulation_steps = 4
+        accumulation_steps = 3
         num_iter = train_size // batch_size # num_iter = 1102
         '''
         # 日誌與模型路徑
         summary_dir = os.path.join(hps.log_dir, 'summary')
         summary_writer = SummaryWriter(log_dir=summary_dir)
         '''
-        d_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.d_op, mode='min', factor=0.9, patience=1, verbose=True)
-        g_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.g_op, mode='min', factor=0.9, patience=1, verbose=True)
+        d_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.d_op, mode='min', factor=0.9, patience=3, verbose=True)
+        g_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.g_op, mode='min', factor=0.9, patience=3, verbose=True)
         
         try:
             for epoch in range(num_epoch):
@@ -382,16 +382,13 @@ class Model(nn.Module):
                     self.d_op.zero_grad()
 
                     d_loss = self.d_loss_calculator(self.x_r, self.angles_g)
-
-                    #print("train discriminator...")
+                    
                     d_loss.backward()
                     if (it + 1) % accumulation_steps == 0:
                         self.d_op.step()
                         del d_loss
-
-                    # 訓練 Generator (每 3 步執行一次)
-                    if it % 3 == 0:
-
+                        
+                        '''訓練 Generator (每 accumulation_steps 步執行一次)'''
                         self.g_op.zero_grad()
 
                         g_loss = self.g_loss_calculator(self.x_r, self.angles_r, self.x_t, self.angles_g)
@@ -399,9 +396,8 @@ class Model(nn.Module):
 
                         #print("train generator...")
                         g_loss.backward()
-                        if (it + 1) % accumulation_steps == 0:
-                            self.g_op.step()
-                            del g_loss
+                        self.g_op.step()
+                        del g_loss
 
                     del train_batch, test_batch
                     torch.cuda.empty_cache()
@@ -466,7 +462,6 @@ class Model(nn.Module):
             # PyTorch 不需要顯式設定動態記憶體增長，它會自動優化 GPU 記憶體使用
         else:
             device = torch.device("cpu")
-        #print(f"Using device: {device}")
         
         for file_name in os.listdir(hps.client_pictures_dir): # for each picture
             each_eval_dir = os.path.join(eval_dir, f'eval_{file_name}')

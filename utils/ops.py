@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-import numpy as np
+from PIL import ImageDraw
 
 
 def instance_norm(x, eps=1e-5, scope=None):

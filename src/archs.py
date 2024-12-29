@@ -12,6 +12,7 @@ class Discriminator(nn.Module):
         self.layers = 5
         self.channel = 64
         self.image_size = params.image_size
+        self.dropout = 0.34
 
         # Input convolution layer
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=self.channel, kernel_size=4, stride=2, padding=1)
@@ -35,10 +36,12 @@ class Discriminator(nn.Module):
     def forward(self, x_init):
         # Input layer
         x = F.leaky_relu(self.conv1(x_init), negative_slope=0.2)
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
         # Hidden layer
         for conv in self.conv_layers:
             x = F.leaky_relu(conv(x), negative_slope=0.2)
+            x = F.dropout(x, p=self.dropout, training=self.training)
 
         # GAN output
         x_gan = self.conv_gan(x) # x_gan.shape = [32, 1, 1, 1]
@@ -56,6 +59,7 @@ class Generator(nn.Module):
     def __init__(self, style_dim=2):
         super(Generator, self).__init__()
         self.style_dim = style_dim
+        self.dropout = 0.4
 
         # Input layer
         self.input_conv = nn.Conv2d(3 + style_dim, 64, kernel_size=7, stride=1, padding=3, bias=False)
@@ -94,6 +98,7 @@ class Generator(nn.Module):
             nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, bias=False),
             nn.InstanceNorm2d(channels, affine=False),
             nn.ReLU(inplace=False),
+            nn.Dropout(p=self.dropout),
             nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, bias=False),
             nn.InstanceNorm2d(channels, affine=False)
         )
@@ -108,12 +113,14 @@ class Generator(nn.Module):
         x = self.input_conv(x)
         x = self.input_norm(x)
         x = F.relu(x) # torch.Size([32, 64, 64, 64])
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
         # Encoder
         for conv, norm in zip(self.encoder_convs, self.encoder_norms):
             x = conv(x)
             x = norm(x)
             x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
             # torch.Size([32, 128, 32, 32])
             # torch.Size([32, 256, 16, 16])
 
@@ -135,6 +142,7 @@ class Generator(nn.Module):
             x = deconv(x)
             x = norm(x)
             x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
             # torch.Size([32, 128, 32, 32])
             # torch.Size([32, 64, 64, 64])
 

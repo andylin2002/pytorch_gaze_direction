@@ -1,7 +1,7 @@
 import os
 from PIL import Image
 import torchvision.transforms as transforms
-
+from utils.ops import random_occlusion
 
 class ImageData(object):
 
@@ -45,27 +45,38 @@ class ImageData(object):
         angles_r,
         labels,
         filename_t,
-        angles_g
+        angles_g,
+        augment
     ):
         
-        def _to_image(file_name):
+        def _to_image(file_name, augment):
             # 加載圖片
             img = Image.open(file_name).convert("RGB" if self.channels == 3 else "L")
             
-            # 定義圖片轉換流水線
-            transform = transforms.Compose([
-                transforms.Resize((self.load_size, self.load_size)),  # 調整大小
-                transforms.ToTensor(),  # 轉換為張量並將像素值歸一化到 [0, 1]
-                transforms.Normalize(mean=[0.5] * self.channels, std=[0.5] * self.channels)  # 將像素值歸一化到 [-1, 1]
+            # 定義數據增強流水線
+            augmentation = transforms.Compose([
+                transforms.RandomErasing(p=0.2, scale=(0.02, 0.1))  # 遮擋
             ])
+            
+            # 定義基本轉換流水線
+            transform = transforms.Compose([
+                transforms.Resize((self.load_size, self.load_size)),  
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5] * self.channels, std=[0.5] * self.channels)
+            ])
+            
+            # 應用增強（僅訓練數據）
+            if augment:
+                img = augmentation(img)
             
             # 應用轉換
             img = transform(img)
             
             return img
+
         
-        image = _to_image(filename)
-        image_t = _to_image(filename_t)
+        image = _to_image(filename, augment)
+        image_t = _to_image(filename_t, augment=False)
 
         return image, angles_r, labels, image_t, angles_g
     

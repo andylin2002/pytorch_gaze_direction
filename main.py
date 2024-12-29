@@ -24,7 +24,7 @@ parser.add_argument('--lr', type=float, default=0.0002,
                     help='learning rate')
 
 # training params
-parser.add_argument('--epochs', type=int, default=20,
+parser.add_argument('--epochs', type=int, default=40,
                     help='number of epochs')
 parser.add_argument('--summary_steps', type=int, default=300,
                     help='summary steps')
