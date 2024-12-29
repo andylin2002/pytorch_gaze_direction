@@ -403,7 +403,7 @@ class Model(nn.Module):
                     torch.cuda.empty_cache()
 
                     # 記錄摘要和保存模型
-                    if it % hps.summary_steps == 0:
+                    if (it + 1) % hps.summary_steps == 0:
                         self.global_step = epoch * num_iter + it
 
                         d_test_loss = self.d_loss_calculator(self.x_test_r, self.angles_test_g).to(device)

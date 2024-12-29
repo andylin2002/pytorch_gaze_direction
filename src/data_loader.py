@@ -1,7 +1,6 @@
 import os
 from PIL import Image
 import torchvision.transforms as transforms
-from utils.ops import random_occlusion
 
 class ImageData(object):
 
@@ -53,24 +52,24 @@ class ImageData(object):
             # 加載圖片
             img = Image.open(file_name).convert("RGB" if self.channels == 3 else "L")
             
-            # 定義數據增強流水線
-            augmentation = transforms.Compose([
-                transforms.RandomErasing(p=0.2, scale=(0.02, 0.1))  # 遮擋
-            ])
-            
             # 定義基本轉換流水線
             transform = transforms.Compose([
                 transforms.Resize((self.load_size, self.load_size)),  
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.5] * self.channels, std=[0.5] * self.channels)
             ])
-            
-            # 應用增強（僅訓練數據）
-            if augment:
-                img = augmentation(img)
+
+            # 定義數據增強流水線
+            augmentation = transforms.Compose([
+                transforms.RandomErasing(p=0.2, scale=(0.02, 0.1))  # 遮擋
+            ])
             
             # 應用轉換
             img = transform(img)
+
+            # 應用增強（僅訓練數據）
+            if augment:
+                img = augmentation(img)
             
             return img
 
