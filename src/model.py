@@ -31,13 +31,13 @@ G_LR = 0.0002
 
 #D's hyperparameter
 D_ADV_WEIGHT = 1
-D_REG_WEIGHT = 1
+D_REG_WEIGHT = 2
 
 #G's hyperparameter
 G_ADV_WEIGHT = 1
-G_REG_WEIGHT = 1
+G_REG_WEIGHT = 2
 G_RECON_WEIGHT = 1
-G_FEAT_WEIGHT = 1000
+G_FEAT_WEIGHT = 1500
 
 AUGMENT = True
 
@@ -264,7 +264,8 @@ class Model(nn.Module):
         if hps.optimizer == 'adam':
             return optim.Adam(model.parameters(),
                             lr=lr,
-                            betas=(hps.adam_beta1, hps.adam_beta2))
+                            betas=(hps.adam_beta1, hps.adam_beta2),
+                            weight_decay=1e-3)
         raise AttributeError("attribute 'optimizer' is not assigned!")
 
     def add_optimizer(self):
@@ -342,8 +343,8 @@ class Model(nn.Module):
         summary_dir = os.path.join(hps.log_dir, 'summary')
         summary_writer = SummaryWriter(log_dir=summary_dir)
         '''
-        d_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.d_op, mode='min', factor=0.9, patience=3, verbose=True)
-        g_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.g_op, mode='min', factor=0.9, patience=3, verbose=True)
+        d_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.d_op, mode='min', factor=0.95, patience=3, verbose=True)
+        g_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.g_op, mode='min', factor=0.95, patience=3, verbose=True)
         
         try:
             for epoch in range(num_epoch):
@@ -454,14 +455,6 @@ class Model(nn.Module):
 
         eval_dir = os.path.join(hps.log_dir, 'eval')
         os.makedirs(eval_dir, exist_ok=True)
-
-        # 設定 GPU 動態記憶體增長
-        if torch.cuda.is_available():
-            device = torch.device("cuda")
-            torch.backends.cudnn.benchmark = True
-            # PyTorch 不需要顯式設定動態記憶體增長，它會自動優化 GPU 記憶體使用
-        else:
-            device = torch.device("cpu")
         
         for file_name in os.listdir(hps.client_pictures_dir): # for each picture
             each_eval_dir = os.path.join(eval_dir, f'eval_{file_name}')
@@ -469,7 +462,11 @@ class Model(nn.Module):
 
             picture_eyes_patch, eyes_position, size = eyes_catch(hps, file_name) # picture_eyes_patch.shape = [eyes' number, 3, 64, 64]
 
-            gaze_angles = torch.zeros(len(picture_eyes_patch), 2)
+            '''==========視線調整=========='''
+            custom_values = torch.tensor([-0.4, 0.0])
+            gaze_angles = torch.zeros(len(picture_eyes_patch), 2)  # 初始化為全 1
+            gaze_angles[:] = custom_values  # 設置每一個的值
+            '''==========視線調整=========='''
 
             with torch.no_grad():  # 禁用梯度計算
                 generated_image = self.generator(picture_eyes_patch, gaze_angles) # generated_image.shape = [number, 3, 64, 64]

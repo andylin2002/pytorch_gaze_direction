@@ -31,7 +31,7 @@ def paste(hps, file_name, generated_image, eyes_position, size):
         center = (size[ith] // 2, size[ith] // 2)
         radius = size[ith] // 2
         cv2.circle(mask, center, radius, 1, thickness=-1)
-        mask = cv2.GaussianBlur(mask, (15, 15), 0)
+        mask = cv2.GaussianBlur(mask, (3, 3), 0)
 
         # 將遮罩應用到貼圖
         mask = mask[..., np.newaxis]  # 增加一個維度以匹配圖像

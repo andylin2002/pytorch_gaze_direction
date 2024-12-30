@@ -61,7 +61,7 @@ class ImageData(object):
 
             # 定義數據增強流水線
             augmentation = transforms.Compose([
-                transforms.RandomErasing(p=0.2, scale=(0.02, 0.1))  # 遮擋
+                transforms.RandomErasing(p=0.3, scale=(0.05, 0.2))  # 遮擋
             ])
             
             # 應用轉換
