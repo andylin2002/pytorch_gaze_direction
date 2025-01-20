@@ -1,6 +1,5 @@
 import torch
 import torch.nn.functional as F
-from PIL import ImageDraw
 
 
 def instance_norm(x, eps=1e-5, scope=None):
@@ -22,7 +21,6 @@ def instance_norm(x, eps=1e-5, scope=None):
     mean = x.mean(dim=(2, 3), keepdim=True)
     std = x.std(dim=(2, 3), keepdim=True)
     return (x - mean) / (std + eps)
-
 
 def conv2d(input_, out_channels, d_h=2, d_w=2, scope='conv_0',
            conv_filters_dim=4, padding='zero', use_bias=True, pad=0):
@@ -148,38 +146,3 @@ def gram(layer):
     denominator = h * w * c  # Normalize by the total number of elements
     grams = torch.bmm(features.transpose(1, 2), features) / denominator  # Batch matrix multiplication and normalization
     return grams
-
-def angular2cart(x):
-    """
-    將角度表示 [phi, theta] 轉換為笛卡爾座標 [x, y, z]。
-    輸入 x 是 [batch_size, 2] 的張量。
-    """
-    phi, theta = x[:, 0], x[:, 1]
-    x = torch.cos(phi) * torch.sin(theta)
-    y = torch.sin(phi) * torch.sin(theta)
-    z = torch.cos(theta)
-
-    return torch.stack([x, y, z], dim=1)  # shape = [batch_size, 3]
-
-
-def angular_error(x, y):
-    """
-    計算角度誤差 (Angular Error)，輸入為兩個張量的角度表示 [phi, theta]。
-    輸出為度數的角度誤差。
-    """
-    # 將角度表示轉換為笛卡爾座標
-    x = angular2cart(x)  # shape = [batch_size, 3]
-    y = angular2cart(y)  # shape = [batch_size, 3]
-
-    # 計算向量的範數
-    x_norm = torch.norm(x, dim=1) + 1e-8  # shape = [batch_size]
-    y_norm = torch.norm(y, dim=1) + 1e-8  # shape = [batch_size]
-
-    # 計算餘弦相似度
-    sim = torch.sum(x * y, dim=1) / (x_norm * y_norm)
-
-    # 限制 sim 在 [-1, 1] 範圍內，避免反餘弦運算錯誤
-    sim = torch.clamp(sim, -1.0, 1.0)
-
-    # 返回平均角度誤差
-    return torch.acos(sim) * 180.0 / torch.pi

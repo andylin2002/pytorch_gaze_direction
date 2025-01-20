@@ -10,24 +10,18 @@ from src.archs import Discriminator, Generator, vgg_16
 from src.data_loader import ImageData
 from torch.utils.data import TensorDataset, DataLoader
 
-from torch.utils.tensorboard import SummaryWriter
-import torchvision.utils as vutils
-
-import numpy as np
 from torchvision.utils import save_image
 
-from utils.ops import l1_loss, content_loss, style_loss, angular_error
+from utils.ops import l1_loss, content_loss, style_loss
 from utils.eyes_catch import eyes_catch
 from utils.paste import paste
 
 from tqdm import tqdm
-from PIL import Image
-import torchvision.transforms as transforms
 from itertools import cycle
 
 #Learning Rate
-D_LR = 0.00005
-G_LR = 0.0002
+D_LR = 5e-5
+G_LR = 2e-4
 
 #D's hyperparameter
 D_ADV_WEIGHT = 1
@@ -54,15 +48,15 @@ class Model(nn.Module):
                 param.requires_grad = False
             print(f"Successfully loaded pretrained weights from {params.vgg_path}")
 
-        self.params = params  # 存儲傳遞的參數
-        self.global_step = torch.tensor(0, dtype=torch.int32, requires_grad=False)  # 全局步數
+        self.params = params
+        self.global_step = torch.tensor(0, dtype=torch.int32, requires_grad=False)
         self.lr = params.lr
 
         def init_weights(m):
             if isinstance(m, torch.nn.Conv2d) or isinstance(m, torch.nn.Linear):
-                torch.nn.init.xavier_uniform_(m.weight)  # Xavier 初始化
+                torch.nn.init.xavier_uniform_(m.weight) # Xavier initialization
                 if m.bias is not None:
-                    torch.nn.init.zeros_(m.bias)  # 偏置初始化為 0
+                    torch.nn.init.zeros_(m.bias) # Initialize bias to 0
 
         self.generator.apply(init_weights)
         self.discriminator.apply(init_weights)
@@ -80,8 +74,7 @@ class Model(nn.Module):
         train_dataset_num = len(image_data_class.train_images)
         test_dataset_num = len(image_data_class.test_images)
 
-        '''train_data'''
-
+        ########## train_data ##########
         train_images = []
         train_angles_r = []
         train_labels = []
@@ -113,8 +106,7 @@ class Model(nn.Module):
             train_angles_g
         )
 
-        '''test_data'''
-
+        ########## test_data ##########
         test_images = []
         test_angles_r = []
         test_labels = []
@@ -155,18 +147,18 @@ class Model(nn.Module):
 
         hps = self.params
 
-        # 判別器對真實樣本和生成樣本的輸出
+        # Discriminator output for real and generated samples
         gan_real, reg_real = self.discriminator(images_r)
         gan_fake, reg_fake = self.discriminator(images_g)
 
-        # 生成插值樣本
+        # Generate interpolated samples
         eps = torch.rand((hps.batch_size, 1, 1, 1), device=images_r.device)
         interpolated = eps * images_r + (1. - eps) * images_g
         interpolated = interpolated.requires_grad_()
 
         gan_inter, _ = self.discriminator(interpolated)
 
-        # 計算梯度懲罰（Gradient Penalty）
+        # Compute gradient penalty
         grad = torch.autograd.grad(
             outputs=gan_inter,
             inputs=interpolated,
@@ -178,15 +170,15 @@ class Model(nn.Module):
         slopes = torch.sqrt(torch.sum(grad**2, dim=[1, 2, 3]))
         gp = torch.mean((slopes - 1)**2)
 
-        # 判別器損失 (Discriminator Loss)
+        # Discriminator Loss
         adv_d_loss = (-torch.mean(gan_real) +
                 torch.mean(gan_fake) +
                 10.0 * gp)
 
-        # 生成器損失 (Generator Loss)
+        # Generator Loss
         adv_g_loss = -torch.mean(gan_fake)
 
-        # 迴歸損失 (Regression Loss)
+        # Regression Loss
         reg_d_loss = F.mse_loss(self.angles_r, reg_real)
         reg_g_loss = F.mse_loss(self.angles_g, reg_fake)
 
@@ -194,7 +186,7 @@ class Model(nn.Module):
 
     def feat_loss(self, image_g, image_t):
         
-        # 定義 VGG 模型和需要的層名稱
+        # Define VGG model and required layer names
         content_layers = ["conv5"]  # conv5_3
         style_layers = [
             "conv1",   # conv1_2
@@ -203,11 +195,9 @@ class Model(nn.Module):
             "conv4"   # conv4_3
         ]
 
-        # 加載預訓練的 VGG16 模型
         _, end_points_image_g = vgg_16(self, image_g)
         _, end_points_image_t = vgg_16(self, image_t)
 
-        # 計算內容損失和風格損失
         c_loss = content_loss(end_points_image_g, end_points_image_t, content_layers)
         s_loss = style_loss(end_points_image_g, end_points_image_t, style_layers)
 
@@ -270,45 +260,18 @@ class Model(nn.Module):
 
     def add_optimizer(self):
 
-        # 創建優化器
         g_op = self.optimizer(self.generator, lr=G_LR)
         d_op = self.optimizer(self.discriminator, lr=D_LR)
 
         return d_op, g_op
-    '''
-    def add_summary(self, writer: SummaryWriter, step: int):
 
-        # 記錄標量
-        writer.add_scalar('Loss/recon_loss', self.recon_loss.item(), step)
-        writer.add_scalar('Loss/adv_g_loss', self.adv_g_loss.item(), step)
-        writer.add_scalar('Loss/adv_d_loss', self.adv_d_loss.item(), step)
-        writer.add_scalar('Loss/reg_d_loss', self.reg_d_loss.item(), step)
-        writer.add_scalar('Loss/reg_g_loss', self.reg_g_loss.item(), step)
-        writer.add_scalar('Metrics/gp', self.gp.item(), step)
-        writer.add_scalar('Learning_Rate', self.lr, step)
-        writer.add_scalar('Loss/c_loss', self.c_loss.item(), step)
-        writer.add_scalar('Loss/s_loss', self.s_loss.item(), step)
-
-        # 記錄影像
-        real_images = (self.x_r + 1) / 2.0
-        #fake_images = torch.clamp((self.x_g + 1) / 2.0, 0., 1.)
-        #recon_images = torch.clamp((self.x_recon + 1) / 2.0, 0., 1.)
-        #valid_images = torch.clamp((self.x_valid_r + 1) / 2.0, 0., 1.)
-
-        writer.add_images('Images/real', real_images, step)
-        #writer.add_images('Images/fake', fake_images, step)
-        #writer.add_images('Images/recon', recon_images, step)
-        #writer.add_images('Images/x_test', valid_images, step)
-    '''
     def train(self, conti = False):
 
         hps = self.params
 
-        # 設定 GPU 動態記憶體增長
         if torch.cuda.is_available():
             device = torch.device("cuda")
             torch.backends.cudnn.benchmark = True
-            # PyTorch 不需要顯式設定動態記憶體增長，它會自動優化 GPU 記憶體使用
         else:
             device = torch.device("cpu")
         print(f"Using device: {device}")
@@ -319,6 +282,8 @@ class Model(nn.Module):
         self.discriminator = self.discriminator.to(device)
 
         self.d_op, self.g_op = self.add_optimizer()
+        self.d_op.zero_grad()
+        self.g_op.zero_grad()
 
         current_model_path = os.path.join(hps.log_dir, "current_model.ckpt")
         if conti:
@@ -331,18 +296,14 @@ class Model(nn.Module):
 
         best_model_loss = float('inf')
 
-        (train_iter, test_iter, train_size) = self.data_loader() #加載訓練、驗證和測試數據集的迭代器
+        (train_iter, test_iter, train_size) = self.data_loader() # Load iterators for training, validation, and test datasets
 
         num_epoch = hps.epochs
         self.num_epoch = num_epoch
         batch_size = hps.batch_size
-        accumulation_steps = 3
+        frequency = 3
         num_iter = train_size // batch_size # num_iter = 1102
-        '''
-        # 日誌與模型路徑
-        summary_dir = os.path.join(hps.log_dir, 'summary')
-        summary_writer = SummaryWriter(log_dir=summary_dir)
-        '''
+
         d_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.d_op, mode='min', factor=0.95, patience=3, verbose=True)
         g_op_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.g_op, mode='min', factor=0.95, patience=3, verbose=True)
         
@@ -355,11 +316,10 @@ class Model(nn.Module):
                     transformed_d_test_loss = float('inf')
                     transformed_g_test_loss = float('inf')
 
-                    # 將數據移動到 GPU（如果有可用的話）
                     train_batch = [t.to(device) for t in train_batch]
                     test_batch = [t.to(device) for t in test_batch]
 
-                    # 解包訓練數據
+                    # Unpack training data
                     self.x_r, self.angles_r, self.labels, self.x_t, self.angles_g = train_batch
                     '''
                     self.x_r: torch.Size([32, 3, 64, 64]),
@@ -369,7 +329,7 @@ class Model(nn.Module):
                     self.angles_g: torch.Size([32, 2])
                     '''
 
-                    # 解包測試數據
+                    # Unpack test data
                     self.x_test_r, self.angles_test_r, self.labels_test, self.x_test_t, self.angles_test_g = test_batch
                     '''
                     self.x_test_r: torch.Size([32, 3, 64, 64]),
@@ -379,31 +339,23 @@ class Model(nn.Module):
                     self.angles_test_g: torch.Size([32, 2])
                     '''
 
-                    # 訓練 Discriminator
+                    # Training Discriminator
                     self.d_op.zero_grad()
+                    self.d_loss_calculator(self.x_r, self.angles_g).backward()
 
-                    d_loss = self.d_loss_calculator(self.x_r, self.angles_g)
-                    
-                    d_loss.backward()
-                    if (it + 1) % accumulation_steps == 0:
+                    if (it + 1) % frequency == 0:
                         self.d_op.step()
-                        del d_loss
                         
-                        '''訓練 Generator (每 accumulation_steps 步執行一次)'''
+                        '''Train Generator (execute every frequency steps)'''
                         self.g_op.zero_grad()
 
-                        g_loss = self.g_loss_calculator(self.x_r, self.angles_r, self.x_t, self.angles_g)
-                        #print(f"generator loss: {g_loss:<15.2f}, discriminator loss: {d_loss:<15.2f}")
-
-                        #print("train generator...")
-                        g_loss.backward()
+                        self.g_loss_calculator(self.x_r, self.angles_r, self.x_t, self.angles_g).backward()
                         self.g_op.step()
-                        del g_loss
 
                     del train_batch, test_batch
                     torch.cuda.empty_cache()
 
-                    # 記錄摘要和保存模型
+                    # Record summaries and save model
                     if (it + 1) % hps.summary_steps == 0:
                         self.global_step = epoch * num_iter + it
 
@@ -413,37 +365,30 @@ class Model(nn.Module):
                         transformed_g_test_loss = torch.exp(g_test_loss / 100).to(device)
                         tqdm.write(f"generator test loss: {transformed_g_test_loss:<10.2f}, discriminator test loss: {transformed_d_test_loss:<10.2f}")
 
-                        #定義比較模型學習好壞的標準
+                        # Define metrics to evaluate model performance
                         challenger_loss = (transformed_g_test_loss + transformed_d_test_loss * (transformed_g_test_loss + transformed_d_test_loss)) # g + d * (g + d)
                         if challenger_loss < best_model_loss:
                             best_model_loss = challenger_loss
                             tqdm.write(f". ݁₊ ⊹ . ݁ ⟡ ݁ . ⊹ ₊ ݁.New lowest loss at step: {self.global_step}. ݁₊ ⊹ . ݁ ⟡ ݁ . ⊹ ₊ ݁.")
 
-                        # 保存模型權重
+                        # Save model weights
                         torch.save({
                                 'current_generator': self.generator.state_dict(),
                                 'current_discriminator': self.discriminator.state_dict(),
                                 'optimizer_generator': self.g_op.state_dict(),
                                 'optimizer_discriminator': self.d_op.state_dict()
                             }, current_model_path)
-                        '''
-                        # 使用自定義的 add_summary 函式
-                        self.add_summary(summary_writer, self.global_step)
-                        '''
 
                         del d_test_loss, transformed_d_test_loss, g_test_loss, transformed_g_test_loss, challenger_loss
                         torch.cuda.empty_cache()
 
-                #每個epoch結束調整學習率
+                # Adjust learning rate at the end of each epoch
                 d_op_scheduler.step(transformed_d_test_loss)
                 g_op_scheduler.step(transformed_g_test_loss)
 
         except KeyboardInterrupt:
             print("Training interrupted.")
-        '''
-        finally:
-            summary_writer.close()
-        '''
+
     def eval(self):
 
         hps = self.params
@@ -462,13 +407,13 @@ class Model(nn.Module):
 
             picture_eyes_patch, eyes_position, size = eyes_catch(hps, file_name) # picture_eyes_patch.shape = [eyes' number, 3, 64, 64]
 
-            '''==========視線調整=========='''
-            custom_values = torch.tensor([0.0, 0.0])
-            gaze_angles = torch.zeros(len(picture_eyes_patch), 2)  # 初始化為全 1
-            gaze_angles[:] = custom_values  # 設置每一個的值
-            '''==========視線調整=========='''
+            '''========== Gaze Adjustment =========='''
+            custom_values = torch.tensor([0, 0])
+            gaze_angles = torch.zeros(len(picture_eyes_patch), 2)
+            gaze_angles[:] = custom_values
+            '''========== Gaze Adjustment =========='''
 
-            with torch.no_grad():  # 禁用梯度計算
+            with torch.no_grad():
                 generated_image = self.generator(picture_eyes_patch, gaze_angles) # generated_image.shape = [number, 3, 64, 64]
                 
                 print(file_name)

@@ -22,23 +22,19 @@ def paste(hps, file_name, generated_image, eyes_position, size):
 
         resized_overlay_image = cv2.resize(overlay_image, (size[ith], size[ith]), interpolation=cv2.INTER_LINEAR)
 
-        # 提取貼圖區域和目標區域的顏色
         target_area = original_image[y : y + size[ith], x : x + size[ith]]
         resized_overlay_image_matched = match_histograms(resized_overlay_image, target_area, channel_axis=-1)
         
-        # 創建一個 Alpha 通道（圓形漸變遮罩）
         mask = np.zeros((size[ith], size[ith]), dtype=np.float32)
         center = (size[ith] // 2, size[ith] // 2)
         radius = size[ith] // 2
         cv2.circle(mask, center, radius, 1, thickness=-1)
         mask = cv2.GaussianBlur(mask, (3, 3), 0)
 
-        # 將遮罩應用到貼圖
-        mask = mask[..., np.newaxis]  # 增加一個維度以匹配圖像
+        mask = mask[..., np.newaxis]
         blended_patch = (resized_overlay_image_matched * mask + 
                         target_area * (1 - mask)).astype(np.uint8)
 
-        # 更新原圖
         original_image[y : y + size[ith], x : x + size[ith]] = blended_patch
         
         output_path = os.path.join(products_dir, f"processed_{file_name}")

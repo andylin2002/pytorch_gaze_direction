@@ -16,7 +16,7 @@ class ImageData(object):
 
         self.file_dict = {}
         for f_name in file_names:
-        # 提取屬性：identity, head_pose, side
+        # Extract attributes: identity, head_pose, side
             fields = f_name.split('.')[0].split('_')
             identity = fields[0]
             head_pose = fields[2]
@@ -24,7 +24,7 @@ class ImageData(object):
             key = '_'.join([identity, head_pose, side])
             if key not in self.file_dict:
                 self.file_dict[key] = []
-            self.file_dict[key].append(f_name) # f_name是照片的完整名稱
+            self.file_dict[key].append(f_name) # f_name is the full name of the photo
 
         self.train_images = []
         self.train_angles_r = []
@@ -49,25 +49,25 @@ class ImageData(object):
     ):
         
         def _to_image(file_name, augment):
-            # 加載圖片
+            # Load image
             img = Image.open(file_name).convert("RGB" if self.channels == 3 else "L")
             
-            # 定義基本轉換流水線
+            # Define basic transformation pipeline
             transform = transforms.Compose([
                 transforms.Resize((self.load_size, self.load_size)),  
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.5] * self.channels, std=[0.5] * self.channels)
             ])
 
-            # 定義數據增強流水線
+            # Define data augmentation pipeline
             augmentation = transforms.Compose([
-                transforms.RandomErasing(p=0.3, scale=(0.05, 0.2))  # 遮擋
+                transforms.RandomErasing(p=0.3, scale=(0.05, 0.2))
             ])
             
-            # 應用轉換
+            # Apply transformations
             img = transform(img)
 
-            # 應用增強（僅訓練數據）
+            # Apply augmentation (training data only)
             if augment:
                 img = augmentation(img)
             
@@ -81,32 +81,32 @@ class ImageData(object):
     
     def preprocess(self):
 
-        for key, file_list in self.file_dict.items():  # 同一個人不同角度的照片
-            if len(file_list) == 1:  # 如果只有一張圖片，跳過
+        for key, file_list in self.file_dict.items(): # Photos of the same person from different angles
+            if len(file_list) == 1: # Skip if there is only one image
                 continue
             
             idx = int(key.split('_')[0])
             flip = 1
-            if key.split('_')[-1] == 'R':  # 判斷是否為右眼
+            if key.split('_')[-1] == 'R': # Check if it's the right eye
                 flip = -1
             
-            for f_r in file_list: # 對於每個key（ex: 0010_0P_R）的照片
+            for f_r in file_list: # For each photo of a key (e.g. 0010_0P_R)
                 file_path = os.path.join(self.data_path, f_r)
-                h_angle_r = flip * float(f_r.split('_')[-2].split('H')[0]) / 15.0  # 水平方向角度
-                v_angle_r = float(f_r.split('_')[-3].split('V')[0]) / 10.0  # 垂直方向角度
+                h_angle_r = flip * float(f_r.split('_')[-2].split('H')[0]) / 15.0 # Horizontal angle
+                v_angle_r = float(f_r.split('_')[-3].split('V')[0]) / 10.0 # Vertical angle
 
                 for f_g in file_list:
                     file_path_t = os.path.join(self.data_path, f_g)
                     h_angle_g = flip * float(f_g.split('_')[-2].split('H')[0]) / 15.0
                     v_angle_g = float(f_g.split('_')[-3].split('V')[0]) / 10.0
                     
-                    if idx <= self.ids:  # 訓練集
+                    if idx <= self.ids: # Training set
                         self.train_images.append(file_path)
                         self.train_angles_r.append([h_angle_r, v_angle_r])
                         self.train_labels.append(idx - 1)
                         self.train_images_t.append(file_path_t)
                         self.train_angles_g.append([h_angle_g, v_angle_g])
-                    else:  # 測試集
+                    else: # Test set
                         self.test_images.append(file_path)
                         self.test_angles_r.append([h_angle_r, v_angle_r])
                         self.test_labels.append(idx - 1)

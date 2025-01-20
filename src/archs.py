@@ -1,10 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import vgg16_bn
-from torchvision.models import VGG16_BN_Weights
-
-from utils.ops import relu, conv2d, lrelu, instance_norm, deconv2d, tanh
 
 class Discriminator(nn.Module):
     def __init__(self, params):
@@ -107,13 +103,15 @@ class Generator(nn.Module):
         # Reshape and tile angles
         angles_reshaped = angles.view(-1, self.style_dim, 1, 1)
         angles_tiled = angles_reshaped.expand(-1, self.style_dim, input_.shape[2], input_.shape[3])
+        x = torch.cat([input_, angles_tiled], dim=1)
+        # torch.Size([32, 5, 64, 64])
 
-        x = torch.cat([input_, angles_tiled], dim=1) # torch.Size([32, 5, 64, 64])
         # Input layer
         x = self.input_conv(x)
         x = self.input_norm(x)
-        x = F.relu(x) # torch.Size([32, 64, 64, 64])
+        x = F.relu(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
+        # torch.Size([32, 64, 64, 64])
 
         # Encoder
         for conv, norm in zip(self.encoder_convs, self.encoder_norms):
@@ -130,12 +128,6 @@ class Generator(nn.Module):
             x = block(x)
             x = x + residual
             # torch.Size([32, 256, 16, 16])
-            # torch.Size([32, 256, 16, 16])
-            # torch.Size([32, 256, 16, 16])
-            # torch.Size([32, 256, 16, 16])
-            # torch.Size([32, 256, 16, 16])
-            # torch.Size([32, 256, 16, 16])
-            
 
         # Decoder
         for deconv, norm in zip(self.decoder_convs, self.decoder_norms):
@@ -148,17 +140,16 @@ class Generator(nn.Module):
 
         # Output layer
         x = self.output_conv(x)
-        x = torch.tanh(x) # torch.Size([32, 3, 64, 64])
+        x = torch.tanh(x)
+        # torch.Size([32, 3, 64, 64])
         return x
 
 
 def vgg_16(self, inputs):
 
-    # 設定 GPU 動態記憶體增長
     if torch.cuda.is_available():
         device = torch.device("cuda")
         torch.backends.cudnn.benchmark = True
-        # PyTorch 不需要顯式設定動態記憶體增長，它會自動優化 GPU 記憶體使用
     else:
         device = torch.device("cpu")
 
@@ -191,7 +182,6 @@ def vgg_16(self, inputs):
     conv5, scope5 = conv_block(512, 512, 3, 'conv5')
     pool5, pool5_scope = max_pool('pool5')
 
-    # 模型的字典存放所有層
     model_dict = nn.ModuleDict({
         'conv1': conv1,
         'pool1': pool1,
@@ -205,13 +195,11 @@ def vgg_16(self, inputs):
         'pool5': pool5
     })
 
-    # 如果提供了預訓練權重的路徑，則載入
     try:
-        model_dict.load_state_dict(self.vgg_dict, strict=False)  # 若權重名稱不完全匹配，允許部分載入
+        model_dict.load_state_dict(self.vgg_dict, strict=False)
     except RuntimeError as e:
         print(f"Error loading pretrained weights: {e}")
 
-    # 移動模型到正確的裝置
     for key in model_dict:
         model_dict[key] = model_dict[key].to(device)
 

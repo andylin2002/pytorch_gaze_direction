@@ -5,7 +5,7 @@ import torch
 from src.model import Model
 
 
-parser = argparse.ArgumentParser() #創建一個解析器對象，這個對象將用於定義和處理命令行參數
+parser = argparse.ArgumentParser()
 
 parser.add_argument('--mode', type=str, default='train',
                     help='running mode')
