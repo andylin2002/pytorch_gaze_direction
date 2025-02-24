@@ -15,7 +15,25 @@ pillow == 10.4.0
 
 ![Method Flowchart](readme_image/gaze_redirection_methodology.jpg)
 
-![loss_design](readme_image/gaze_redirection_loss_design.jpg)
+**Pre-setup and Training Phase**
+- Set the **dlib** criteria for determining open and closed eyes
+- Use a facial dataset to create eye patches using **dlib** and train the model
+
+**Usage Phase**
+- Extract eye patches from individual faces in multiple group photo using dlib and resize them.
+- Determine if the eyes are open or closed.
+  - If everyone in the photo has their eyes open, perform gaze redirection and copy the image to the usable photo folder.
+  - If anyone in the photo has their eyes closed, treat the photo as NG (not good) and move it to a separate folder.
+
+## Loss Design
+![loss_design](readme_image/gaze_redirection_loss_design_adv.jpg)
+![loss_design](readme_image/gaze_redirection_loss_design_D.jpg)
+![loss_design](readme_image/gaze_redirection_loss_design_G.jpg)
+
+## Results
+
+![tzuyu](readme_image/gaze_redirection_result_1.jpg)
+![tzuyu](readme_image/gaze_redirection_result_2.jpg)
 
 ## Train
 
