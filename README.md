@@ -15,6 +15,8 @@ pillow == 10.4.0
 
 ![Method Flowchart](readme_image/gaze_redirection_methodology.jpg)
 
+![loss_design](readme_image/gaze_redirection_loss_design.jpg)
+
 ## Train
 
 ```Bash
