@@ -35,6 +35,12 @@ pillow == 10.4.0
 ![tzuyu](readme_image/gaze_redirection_result_1.jpg)
 ![tzuyu](readme_image/gaze_redirection_result_2.jpg)
 
+**Trained weights file**: [click here](https://drive.google.com/drive/folders/1Md5oNycrS5r_NYJDeZUW563aTzxzMaH6?usp=drive_link)
+
+## Dataset
+**original dataset**: [click here](https://www.cs.columbia.edu/~brian/projects/columbia_gaze.html) <br />
+**preprocessing dataset**: [click here](https://drive.google.com/drive/folders/1Lk9xDfrK0lsB4I7zJ1Psonx0FDsD0eaZ?usp=drive_link)
+
 ## Train
 
 ```Bash
