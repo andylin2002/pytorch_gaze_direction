@@ -13,7 +13,7 @@ pillow == 10.4.0
 
 ## Methodology
 
-
+![Method Flowchart](readme_image/methodology.jpg)
 
 ## Train
 
