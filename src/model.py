@@ -408,7 +408,7 @@ class Model(nn.Module):
             picture_eyes_patch, eyes_position, size = eyes_catch(hps, file_name) # picture_eyes_patch.shape = [eyes' number, 3, 64, 64]
 
             '''========== Gaze Adjustment =========='''
-            custom_values = torch.tensor([0, 0])
+            custom_values = torch.tensor([0, 0.6])
             gaze_angles = torch.zeros(len(picture_eyes_patch), 2)
             gaze_angles[:] = custom_values
             '''========== Gaze Adjustment =========='''
