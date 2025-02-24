@@ -57,6 +57,7 @@ python main.py --mode eval --client_pictures_dir ./client_pictures/ --log_dir ./
 wget https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth
 ```
 
+<!--
 ## Push
 ```
 git push -u origin
@@ -65,3 +66,4 @@ git push -u origin
 ```
 git pull --rebase
 ```
+-->
